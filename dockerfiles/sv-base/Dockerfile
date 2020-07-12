@@ -11,7 +11,7 @@ ENV HOME=/root
 # GATK - only used for LocalizeSVEvidence
 ARG GATK_TRANSIENT_DEP="git git-lfs"
 ARG GATK_DEP="openjdk-8-jdk ${GATK_TRANSIENT_DEP}"
-ARG GATK_COMMIT="6cdf81094a43c4e1cf873474dd8480b1da6f128b"
+ARG GATK_COMMIT="0dcf3ce5f473052e6032c958db1d22bc31d5a274"
 ENV GATK_JAR="/opt/gatk.jar"
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -qqy update --fix-missing && \
