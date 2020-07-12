@@ -32,6 +32,7 @@ workflow MatrixQC {
     File PE_file
     File BAF_idx
     File genome_file
+    File ref_dict
     File RD_file
     File RD_idx
     File PE_idx
@@ -48,6 +49,7 @@ workflow MatrixQC {
       matrix_file = BAF_file,
       matrix_index = BAF_idx,
       genome_file = genome_file,
+      ref_dict = ref_dict,
       prefix = "${batch}.BAF",
       ev = "BAF",
       batch = batch,
@@ -61,6 +63,7 @@ workflow MatrixQC {
       matrix_file = RD_file,
       matrix_index = RD_idx,
       genome_file = genome_file,
+      ref_dict = ref_dict,
       prefix = "${batch}.RD",
       ev = "RD",
       batch = batch,
@@ -74,6 +77,7 @@ workflow MatrixQC {
       matrix_file = PE_file,
       matrix_index = PE_idx,
       genome_file = genome_file,
+      ref_dict = ref_dict,
       prefix = "${batch}.PE",
       ev = "PE",
       batch = batch,
@@ -87,6 +91,7 @@ workflow MatrixQC {
       matrix_file = SR_file,
       matrix_index = SR_idx,
       genome_file = genome_file,
+      ref_dict = ref_dict,
       prefix = "${batch}.SR",
       ev = "SR",
       batch = batch,
@@ -120,6 +125,7 @@ task PESRBAF_QC {
     File matrix_file
     File matrix_index
     File genome_file
+    File ref_dict
     String prefix
     Int distance
     String batch
@@ -153,10 +159,18 @@ task PESRBAF_QC {
   command <<<
 
     set -euo pipefail
-    fgrep -v "#" ~{genome_file} | awk -v distance=~{distance} -v OFS="\t" '{ print $1, $2-distance, $2 }' > regions.bed;
-    GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` \
-      tabix -R regions.bed ~{matrix_file} | bgzip -c -f > local_matrix.txt.gz
-    tabix -s 1 -b 2 -e 2 -f local_matrix.txt.gz;
+    fgrep -v "#" ~{genome_file} | awk -v distance=~{distance} -v OFS="\t" '{ print $1, $2-distance, $2 }' > regions.bed
+
+    java -jar ${GATK_JAR} LocalizeSVEvidence \
+      --sequence-dictionary ~{ref_dict} \
+      --evidence-file ~{matrix_file} \
+      -L regions.bed
+      -O local_matrix.txt
+
+    # GATK does not block compress
+    bgzip local_matrix.txt
+    tabix -s 1 -b 2 -e 2 local_matrix.txt.gz
+
     /opt/sv-pipeline/00_preprocessing/misc_scripts/nonRD_matrix_QC.sh \
       -d ~{distance} \
       local_matrix.txt.gz \
@@ -182,6 +196,7 @@ task RD_QC {
     File matrix_file
     File matrix_index
     File genome_file
+    File ref_dict
     String prefix
     String ev
     String batch
@@ -216,9 +231,17 @@ task RD_QC {
 
     set -euo pipefail
     fgrep -v "#" ~{genome_file} | awk -v distance=~{distance} -v OFS="\t" '{ print $1, $2-distance, $2 }' > regions.bed
-    GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` \
-      tabix -h -R regions.bed ~{matrix_file} | bgzip -c -f > local_matrix.bed.gz
-    tabix -p bed local_matrix.bed.gz;
+
+    java -jar ${GATK_JAR} LocalizeSVEvidence \
+      --sequence-dictionary ~{ref_dict} \
+      --evidence-file ~{matrix_file} \
+      -L regions.bed
+      -O local_matrix.bed
+
+    # GATK does not block compress
+    bgzip local_matrix.bed
+    tabix -p bed local_matrix.bed.gz
+
     /opt/sv-pipeline/00_preprocessing/misc_scripts/RD_matrix_QC.sh \
       -d ~{distance} \
       local_matrix.bed.gz \

@@ -18,7 +18,7 @@ workflow AnnotateVcf {
 
   input {
 
-    String vcf
+    File vcf
     String prefix
     File vcf_idx
     File contig_list
@@ -87,7 +87,7 @@ task SubsetVcf {
 
   input {
 
-    String vcf
+    File vcf
     File   vcf_idx
     String contig
     String prefix
@@ -95,6 +95,15 @@ task SubsetVcf {
     String sv_pipeline_docker
     
     RuntimeAttr? runtime_attr_override
+  }
+
+  parameter_meta {
+    vcf: {
+      localization_optional: true
+    }
+    vcf_idx: {
+      localization_optional: true
+    }
   }
 
   output {
@@ -106,10 +115,13 @@ task SubsetVcf {
 
     set -euo pipefail
 
-    # Remote tabix to chromosome of interest
-    GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` \
-      tabix -h ~{vcf} "~{contig}:0-300000000" | bgzip -c > "~{prefix}.~{contig}.vcf.gz"
+    java -jar ${GATK_JAR} SelectVariants \
+      -V "~{vcf}" \
+      -L "~{contig}" \
+      -O ~{prefix}.~{contig}.vcf
 
+    # GATK does not block compress
+    bgzip ~{prefix}.~{contig}.vcf
     tabix -p vcf -f "~{prefix}.~{contig}.vcf.gz"
   
   >>>

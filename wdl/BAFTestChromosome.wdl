@@ -213,7 +213,7 @@ task SplitBafVcf {
   command <<<
 
     set -euo pipefail 
-    tabix -p vcf ~{vcf};
+    tabix -p vcf ~{vcf}
     #TODO : split -a parameter should be scaled properly (using suffix_len does not always work)
     tabix -h ~{vcf} ~{chrom} \
       | svtk vcf2bed --no-header stdin stdout \

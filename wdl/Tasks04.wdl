@@ -31,14 +31,14 @@ task SplitVariants {
     set -euo pipefail
     svtk vcf2bed ~{vcf} stdout \
       | awk -v OFS="\t" '(($5=="DEL" || $5=="DUP") && $3-$2>=5000) {print $1, $2, $3, $4, $6, $5}' \
-      | split -l ~{n_per_split} -a 6 - gt5kb.
+      | split --additional-suffix ".bed" -l ~{n_per_split} -a 6 - gt5kb.
     svtk vcf2bed ~{vcf} stdout \
       | awk -v OFS="\t" '(($5=="DEL" || $5=="DUP") && $3-$2<5000) {print $1, $2, $3, $4, $6, $5}' \
-      | split -l ~{n_per_split} -a 6 - lt5kb.
+      | split --additional-suffix ".bed" -l ~{n_per_split} -a 6 - lt5kb.
     if [ ~{generate_bca} == "true" ]; then
       svtk vcf2bed ~{vcf} stdout \
-        | awk -v OFS="\t" '($5!="DEL" && $5!="DUP") {print $1, $2, $3, $4, $6, $5}' \
-        | split -l ~{n_per_split} -a 6 - bca.
+        | awk -v OFS="\t" '($5!="DEL" && $5!="DUP") {print $1, $2RDTestGenotype, $3, $4, $6, $5}' \
+        | split --additional-suffix ".bed" -l ~{n_per_split} -a 6 - bca.
     fi
 
   >>>
@@ -291,6 +291,7 @@ task RDTestGenotype {
     File coveragefile
     File medianfile
     File famfile
+    File ref_dict
     Array[String] samples
     File gt_cutoffs
     Int n_bins
@@ -327,7 +328,19 @@ task RDTestGenotype {
   command <<<
 
     set -euo pipefail
-    /opt/RdTest/localize_bincov.sh ~{bed} ~{coveragefile}
+
+    # Ensure proper bed file extension
+    java -jar ${GATK_JAR} LocalizeSVEvidence \
+      --include-header \
+      --sequence-dictionary ~{ref_dict} \
+      --evidence-file ~{coveragefile} \
+      -L ~{bed} \
+      -O local_coverage.bed
+
+    # GATK does not block compress
+    bgzip local_coverage.bed
+    tabix -p bed local_coverage.bed.gz
+
     Rscript /opt/RdTest/RdTest.R \
       -b ~{bed} \
       -c local_coverage.bed.gz \
@@ -364,6 +377,7 @@ task CountPE {
     File vcf
     File discfile
     File medianfile
+    File ref_dict
     Array[String] samples
     String sv_pipeline_docker
     RuntimeAttr? runtime_attr_override
@@ -398,8 +412,16 @@ task CountPE {
     awk -v OFS="\t" -v window=5000 '{if ($3-window>0){print $1,$3-window,$3+window}else{print $1,0,$3+window}}' test.bed  >> region.bed
     sort -k1,1 -k2,2n region.bed > region.sorted.bed
     bedtools merge -i region.sorted.bed > region.merged.bed
-    GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` \
-      tabix -R region.merged.bed ~{discfile} | bgzip -c > PE.txt.gz
+
+    java -jar ${GATK_JAR} LocalizeSVEvidence \
+      --sequence-dictionary ~{ref_dict} \
+      --evidence-file ~{discfile} \
+      -L region.merged.bed \
+      -O PE.txt
+
+    # GATK does not block compress
+    bgzip PE.txt
+
     tabix -b 2 -e 2 PE.txt.gz
     svtk count-pe --index PE.txt.gz.tbi -s ~{write_lines(samples)} --medianfile ~{medianfile} ~{vcf} PE.txt.gz ~{prefix}.pe_counts.txt
     gzip ~{prefix}.pe_counts.txt
@@ -421,6 +443,7 @@ task CountSR {
     File vcf
     File splitfile
     File medianfile
+    File ref_dict
     Array[String] samples
     String sv_pipeline_docker
     RuntimeAttr? runtime_attr_override
@@ -456,8 +479,16 @@ task CountSR {
     awk -v OFS="\t" '{if ($3-250>0){print $1,$3-250,$3+250}else{print $1,0,$3+250}}' test.bed  >> region.bed
     sort -k1,1 -k2,2n region.bed > region.sorted.bed
     bedtools merge -i region.sorted.bed > region.merged.bed
-    GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` \
-      tabix -R region.merged.bed ~{splitfile} | bgzip -c > SR.txt.gz
+
+    java -jar ${GATK_JAR} LocalizeSVEvidence \
+      --sequence-dictionary ~{ref_dict} \
+      --evidence-file ~{splitfile} \
+      -L region.merged.bed \
+      -O SR.txt
+
+    # GATK does not block compress
+    bgzip SR.txt
+
     tabix -b 2 -e 2 SR.txt.gz
     svtk count-sr --index SR.txt.gz.tbi -s ~{write_lines(samples)} --medianfile ~{medianfile} ~{vcf} SR.txt.gz ~{prefix}.sr_counts.txt
     /opt/sv-pipeline/04_variant_resolution/scripts/sum_SR.sh ~{prefix}.sr_counts.txt ~{prefix}.sr_sum.txt.gz

@@ -51,7 +51,7 @@ workflow VcfClusterSingleChrom {
     RuntimeAttr? runtime_override_concat_shards
   }
   
-  #Remote tabix each vcf & join into a single vcf
+  #Stream each vcf & join into a single vcf
   call JoinContigFromRemoteVcfs as JoinVcfs {
     input:
       vcfs=vcfs,
@@ -165,43 +165,25 @@ task JoinContigFromRemoteVcfs {
   command <<<
     set -eu -o pipefail
     
-    #Remote tabix all vcfs to chromosome of interest
-    1>&2 echo "REMOTE TABIXING VCFs"
-    
-    # needed for tabix to operate on remote files
-    export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token`
+    #Stream all vcfs to chromosome of interest
+    1>&2 echo "STREAMING VCFs"
 
+    touch subsetted_vcfs.list
     paste ~{write_lines(batches)} ~{write_lines(vcfs)} | while read BATCH VCF_PATH; do
-      1>&2 echo "BATCH=$BATCH"
-      1>&2 echo "VCF_PATH=$VCF_PATH"
-      if gsutil ls "$VCF_PATH*" | grep -q '\.tbi$' || false; then
-        INDEX_PRESENT=1
-      else
-        INDEX_PRESENT=0
-      fi
-      if [ $INDEX_PRESENT == 1 ]; then
-        1>&2 echo "Found index: $VCF_PATH.tbi"
-        TABIX_VCF="$VCF_PATH"
-        1>&2 echo "USING $TABIX_VCF"
-      else
-        1>&2 echo -e "WARNING: no index file for $VCF_PATH\n\tlocalizing and indexing"
-        TABIX_VCF=$(basename "$VCF_PATH")
-        1>&2 echo "Using $TABIX_VCF"
-        gsutil -m cp "$VCF_PATH" .
-        tabix -p vcf "$TABIX_VCF"
-      fi
-      BATCH_VCF="$BATCH.~{contig}.vcf"
-      BATCH_VCF=${BATCH_VCF//[[:space:]]/_}
-      tabix -h "$TABIX_VCF" "~{contig}:0-300000000"|sed "s/AN=[0-9]*;//g"|sed "s/AC=[0-9]*;//g" > "$BATCH_VCF"
-      bgzip -f "$BATCH_VCF"
-      if [ $INDEX_PRESENT == 0 ]; then
-        rm $TABIX_VCF
-      fi
+      java -jar ${GATK_JAR} SelectVariants \
+        -V "${VCF_PATH}" \
+        -L "~{contig}" \
+        -O "tmp.vcf.gz"
 
-      # echo and pipe batch vcf name to subsetted_vcfs.list, and echo to stderr for debugging purposes
-      echo "$BATCH_VCF.gz"
-      1>&2 echo "Made $BATCH_VCF.gz"
-    done > subsetted_vcfs.list
+      zcat tmp.vcf.gz \
+        | sed "s/AN=[0-9]*;//g" \
+        | sed "s/AC=[0-9]*;//g" \
+        | bgzip -c \
+        > $BATCH.~{contig}.vcf.gz
+      rm tmp.vcf.gz
+      tabix $BATCH.~{contig}.vcf.gz
+      echo "$BATCH.~{contig}.vcf.gz" >> subsetted_vcfs.list
+    done
 
     1>&2 echo "SANITY CHECK"
 
@@ -242,7 +224,7 @@ task JoinContigFromRemoteVcfs {
       | sed -e 's/ID=EV,Number=.,Type=String/ID=EV,Number=1,Type=Integer/g' \
       | bgzip -c > ~{prefix}.unclustered.vcf.gz
 
-    tabix -f -p vcf "~{prefix}.unclustered.vcf.gz"
+    tabix -p vcf "~{prefix}.unclustered.vcf.gz"
   >>>
 
   output {
