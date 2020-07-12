@@ -7,6 +7,31 @@ FROM ${MINIBASE_IMAGE}
 
 ENV HOME=/root
 
+####################################################################################################
+# GATK - only used for LocalizeSVEvidence
+ARG GATK_TRANSIENT_DEP="git git-lfs"
+ARG GATK_DEP="openjdk-8-jdk ${GATK_TRANSIENT_DEP}"
+ARG GATK_COMMIT="72b96142fe2edd4d5d734829d7d4be29718e9580"
+ENV GATK_JAR="/opt/gatk.jar"
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get -qqy update --fix-missing && \
+    apt-get -qqy dist-upgrade && \
+    apt-get -qqy install --no-install-recommends \
+                 ${GATK_DEP} && \
+    cd / && git clone https://github.com/broadinstitute/gatk.git && \
+    cd gatk && git lfs install && \
+    git checkout ${GATK_COMMIT} && \ ./gradlew localJar && \
+    mv build/libs/gatk.jar ${GATK_JAR} && \
+    apt-get -qqy purge ${GATK_TRANSIENT_DEP} && \
+    apt-get -qqy clean && \
+    rm -rf /tmp/* \
+           /var/tmp/* \
+           /var/cache/apt/* \
+           /var/lib/apt/lists/* \
+           /usr/share/man/?? \
+           /usr/share/man/??_* && \
+    java -jar ${GATK_JAR}
+
 # we settle on this order because the autoremove steps in G-Cloud and R blocks simply hate python and remove it
 
 ####################################################################################################
