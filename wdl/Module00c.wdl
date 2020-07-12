@@ -41,6 +41,9 @@ workflow Module00c {
     File ped_file
     File genome_file
     File primary_contigs_fai            # .fai file of whitelisted contigs
+    File ref_fasta
+    File ref_fasta_index
+    File ref_dict
 
     # PE/SR/BAF/bincov files
     Array[File] counts
@@ -59,9 +62,6 @@ workflow Module00c {
     Array[File]? gvcfs
     File? unpadded_intervals_file
     File? dbsnp_vcf
-    File? ref_fasta
-    File? ref_fasta_index
-    File? ref_dict
 
     # BAF Option #2, position-sharded VCFs
     Array[File]? snp_vcfs
@@ -231,9 +231,9 @@ workflow Module00c {
         samples = samples,
         unpadded_intervals_file = select_first([unpadded_intervals_file]),
         dbsnp_vcf = select_first([dbsnp_vcf]),
-        ref_fasta = select_first([ref_fasta]),
-        ref_fasta_index = select_first([ref_fasta_index]),
-        ref_dict = select_first([ref_dict]),
+        ref_fasta = ref_fasta,
+        ref_fasta_index = ref_fasta_index,
+        ref_dict = ref_dict,
         inclusion_bed = inclusion_bed,
         batch = batch,
         gatk_docker = gatk_docker,
@@ -314,6 +314,7 @@ workflow Module00c {
       ped_file = select_first([AddCaseSampleToPed.combined_ped_file, ped_file]),
       blacklist = cnmops_blacklist,
       allo_file = cnmops_allo_file,
+      ref_dict = ref_dict,
       prefix = "large",
       min_size=cnmops_large_min_size,
       stitch_and_clean_large_events = true,
