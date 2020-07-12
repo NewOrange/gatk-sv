@@ -288,6 +288,7 @@ workflow Module00c {
       ped_file = select_first([AddCaseSampleToPed.combined_ped_file, ped_file]),
       blacklist = cnmops_blacklist,
       allo_file = cnmops_allo_file,
+      ref_dict = ref_dict,
       prefix = "header",
       stitch_and_clean_large_events = false,
       mem_gb_override_sample10 = cnmops_mem_gb_override_sample10,

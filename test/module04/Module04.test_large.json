@@ -1,7 +1,7 @@
 {
   "Module04.sv_base_mini_docker": "gatksv/sv-base-mini:b3af2e3",
-  "Module04.sv_pipeline_docker": "cwhelan/sv-pipeline:cw_3c9d26c_single_sample_annotations",
-  "Module04.sv_pipeline_rdtest_docker": "gatksv/sv-pipeline-rdtest:b3af2e3",
+  "Module04.sv_pipeline_docker": "mwalker174/sv-pipeline:mw-gatk-tabix-0dcf3ce",
+  "Module04.sv_pipeline_rdtest_docker": "mwalker174/sv-pipeline-rdtest:mw-gatk-tabix-0dcf3ce",
   "Module04.linux_docker" : "ubuntu:18.04",
 
   "Module04.n_RD_genotype_bins": "100000", 
