@@ -20,7 +20,7 @@ RUN apt-get -qqy update --fix-missing && \
                  ${GATK_DEP} && \
     cd / && git clone https://github.com/broadinstitute/gatk.git && \
     cd gatk && git lfs install && \
-    git checkout ${GATK_COMMIT} && \ ./gradlew localJar && \
+    git checkout ${GATK_COMMIT} && ./gradlew localJar && \
     mv build/libs/gatk.jar ${GATK_JAR} && \
     apt-get -qqy purge ${GATK_TRANSIENT_DEP} && \
     apt-get -qqy clean && \
