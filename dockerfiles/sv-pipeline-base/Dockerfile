@@ -37,11 +37,11 @@ RUN apt-get -qqy update --fix-missing && \
                  libopenblas-dev \
                  libxml2-dev && \
     mkdir -p /tmp/R_pkg_download/ && \
-    cd /opt/ && \
-    /opt/install_deprecated_R_package.sh https://cran.r-project.org/src/contrib/Archive/XML/XML_3.99-0.3.tar.gz && \
-    cd "/usr/lib/R/site-library" && eval ${SLIM_R_LIB_CMD} && \
-    cd "/usr/local/lib/R/site-library" && eval ${SLIM_R_LIB_CMD} && \
-    apt-get -qqy remove make cmake automake && \
+    cd /opt/
+RUN /opt/install_deprecated_R_package.sh https://cran.r-project.org/src/contrib/Archive/XML/XML_3.99-0.3.tar.gz
+RUN cd "/usr/lib/R/site-library" && eval ${SLIM_R_LIB_CMD}
+RUN cd "/usr/local/lib/R/site-library" && eval ${SLIM_R_LIB_CMD}
+RUN apt-get -qqy remove make cmake automake && \
     apt-get -qqy clean && \
     rm -rf /tmp/* \
            /var/tmp/* \
