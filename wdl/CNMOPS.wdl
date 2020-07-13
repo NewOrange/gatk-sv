@@ -330,6 +330,9 @@ task CNSampleNormal {
   }
   RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
 
+  Float mem_gb = select_first([runtime_attr.mem_gb, default_attr.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
+
   output {
     File Gff = "calls/cnMOPS.cnMOPS.gff"
   }
@@ -337,7 +340,7 @@ task CNSampleNormal {
 
     set -euo pipefail
 
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --include-header \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{bincov_matrix} \
@@ -370,7 +373,7 @@ task CNSampleNormal {
   >>>
   runtime {
     cpu: select_first([runtime_attr.cpu_cores, default_attr.cpu_cores])
-    memory: select_first([mem_gb_override, runtime_attr.mem_gb, default_attr.mem_gb]) + " GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk " + select_first([runtime_attr.disk_gb, default_attr.disk_gb]) + " HDD"
     bootDiskSizeGb: select_first([runtime_attr.boot_disk_gb, default_attr.boot_disk_gb])
     docker: cnmops_docker

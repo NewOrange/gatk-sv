@@ -217,9 +217,13 @@ task RdTestGenotype {
     boot_disk_gb: 10
   }
   RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+  Float mem_gb = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
+
   runtime {
-    memory: "~{select_first([runtime_override.mem_gb, runtime_default.mem_gb])} GiB"
-    disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+    memory: mem_gb + " GiB"
+    disks: "local-disk " + select_first([runtime_override.disk_gb, runtime_default.disk_gb]) + " HDD"
     cpu: select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
     preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
     maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
@@ -234,7 +238,7 @@ task RdTestGenotype {
 
     set -o pipefail
 
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{coverage_file} \
       -L merged.bed \

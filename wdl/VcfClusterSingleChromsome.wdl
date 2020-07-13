@@ -117,7 +117,7 @@ workflow VcfClusterSingleChrom {
 }
 
 
-# Task to remote tabix a single chromosome for all VCFs, then merge row-wise
+# Task to stream a single chromosome for all VCFs, then merge row-wise
 task JoinContigFromRemoteVcfs {
   input {
     Array[File] vcfs
@@ -152,8 +152,12 @@ task JoinContigFromRemoteVcfs {
     boot_disk_gb: 10
   }
   RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+  Float mem_gb = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
+
   runtime {
-    memory: "~{select_first([runtime_override.mem_gb, runtime_default.mem_gb])} GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
     cpu: select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
     preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
@@ -170,7 +174,7 @@ task JoinContigFromRemoteVcfs {
 
     touch subsetted_vcfs.list
     paste ~{write_lines(batches)} ~{write_lines(vcfs)} | while read BATCH VCF_PATH; do
-      java -jar ${GATK_JAR} SelectVariants \
+      java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} SelectVariants \
         -V "${VCF_PATH}" \
         -L "~{contig}" \
         -O "tmp.vcf.gz"

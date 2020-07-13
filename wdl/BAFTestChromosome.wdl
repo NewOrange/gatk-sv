@@ -100,6 +100,9 @@ task BAFTest {
   }
   RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
 
+  Float mem_gb = select_first([runtime_attr.mem_gb, default_attr.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
+
   output {
     File stats = "${prefix}.metrics"
   }
@@ -114,10 +117,10 @@ task BAFTest {
     chrom=$(cut -f1 ~{bed} | head -n1)
     set -o pipefail
 
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{baf_metrics} \
-      -L ${chrom}:${start}-${end} \
+      -L "${chrom}:${start}-${end}" \
       -O local_baf.bed
 
     # GATK does not block compress
@@ -129,7 +132,7 @@ task BAFTest {
   >>>
   runtime {
     cpu: select_first([runtime_attr.cpu_cores, default_attr.cpu_cores])
-    memory: select_first([runtime_attr.mem_gb, default_attr.mem_gb]) + " GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk " + select_first([runtime_attr.disk_gb, default_attr.disk_gb]) + " HDD"
     bootDiskSizeGb: select_first([runtime_attr.boot_disk_gb, default_attr.boot_disk_gb])
     docker: sv_pipeline_docker

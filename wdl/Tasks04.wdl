@@ -317,6 +317,9 @@ task RDTestGenotype {
   }
   RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
 
+  Float mem_gb = select_first([runtime_attr.mem_gb, default_attr.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
+
   output {
     File genotypes = "${prefix}.geno"
     File copy_states = "${prefix}.median_geno"
@@ -330,7 +333,7 @@ task RDTestGenotype {
     set -euo pipefail
 
     # Ensure proper bed file extension
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --include-header \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{coveragefile} \
@@ -362,7 +365,7 @@ task RDTestGenotype {
   >>>
   runtime {
     cpu: select_first([runtime_attr.cpu_cores, default_attr.cpu_cores])
-    memory: select_first([runtime_attr.mem_gb, default_attr.mem_gb]) + " GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk " + select_first([runtime_attr.disk_gb, default_attr.disk_gb]) + " HDD"
     bootDiskSizeGb: select_first([runtime_attr.boot_disk_gb, default_attr.boot_disk_gb])
     docker: sv_pipeline_rdtest_docker
@@ -398,6 +401,9 @@ task CountPE {
     max_retries: 1
   }
   RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+
+  Float mem_gb = select_first([runtime_attr.mem_gb, default_attr.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
   
   String prefix = basename(vcf, ".vcf")
 
@@ -413,7 +419,7 @@ task CountPE {
     sort -k1,1 -k2,2n region.bed > region.sorted.bed
     bedtools merge -i region.sorted.bed > region.merged.bed
 
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{discfile} \
       -L region.merged.bed \
@@ -429,7 +435,7 @@ task CountPE {
   >>>
   runtime {
     cpu: select_first([runtime_attr.cpu_cores, default_attr.cpu_cores])
-    memory: select_first([runtime_attr.mem_gb, default_attr.mem_gb]) + " GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk " + select_first([runtime_attr.disk_gb, default_attr.disk_gb]) + " HDD"
     bootDiskSizeGb: select_first([runtime_attr.boot_disk_gb, default_attr.boot_disk_gb])
     docker: sv_pipeline_docker
@@ -464,6 +470,9 @@ task CountSR {
     max_retries: 1
   }
   RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
+
+  Float mem_gb = select_first([runtime_attr.mem_gb, default_attr.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
   
   String prefix = basename(vcf, ".vcf")
 
@@ -480,7 +489,7 @@ task CountSR {
     sort -k1,1 -k2,2n region.bed > region.sorted.bed
     bedtools merge -i region.sorted.bed > region.merged.bed
 
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{splitfile} \
       -L region.merged.bed \
@@ -497,7 +506,7 @@ task CountSR {
   >>>
   runtime {
     cpu: select_first([runtime_attr.cpu_cores, default_attr.cpu_cores])
-    memory: select_first([runtime_attr.mem_gb, default_attr.mem_gb]) + " GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk " + select_first([runtime_attr.disk_gb, default_attr.disk_gb]) + " HDD"
     bootDiskSizeGb: select_first([runtime_attr.boot_disk_gb, default_attr.boot_disk_gb])
     docker: sv_pipeline_docker

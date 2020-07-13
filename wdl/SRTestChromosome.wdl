@@ -194,6 +194,9 @@ task SRTest {
   }
   RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
 
+  Float mem_gb = select_first([runtime_attr.mem_gb, default_attr.mem_gb])
+  Int java_mem_mb = ceil(mem_gb * 1000 * 0.8)
+
   output {
     File stats = "${prefix}.stats"
   }
@@ -206,7 +209,7 @@ task SRTest {
     sort -k1,1 -k2,2n region.bed > region.sorted.bed
     bedtools merge -d 16384 -i region.sorted.bed > region.merged.bed
 
-    java -jar ${GATK_JAR} LocalizeSVEvidence \
+    java -Xmx~{java_mem_mb}M -jar ${GATK_JAR} LocalizeSVEvidence \
       --sequence-dictionary ~{ref_dict} \
       --evidence-file ~{splitfile} \
       -L region.merged.bed \
@@ -221,7 +224,7 @@ task SRTest {
   >>>
   runtime {
     cpu: select_first([runtime_attr.cpu_cores, default_attr.cpu_cores])
-    memory: select_first([runtime_attr.mem_gb, default_attr.mem_gb]) + " GiB"
+    memory: mem_gb + " GiB"
     disks: "local-disk " + select_first([runtime_attr.disk_gb, default_attr.disk_gb]) + " HDD"
     bootDiskSizeGb: select_first([runtime_attr.boot_disk_gb, default_attr.boot_disk_gb])
     docker: sv_pipeline_docker
